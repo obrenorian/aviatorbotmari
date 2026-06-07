@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aviator Signal Bot — Painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222;
+    --border2: #2d2d2d;
+    --gold: #f5c842;
+    --gold2: #e8b020;
+    --gold-dim: rgba(245,200,66,0.12);
+    --red: #ff4444;
+    --green: #00e676;
+    --text: #f0f0f0;
+    --muted: #666;
+    --muted2: #888;
+    --font: 'Space Grotesk', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+  }
+  .logo {
+    width: 36px; height: 36px;
+    background: var(--gold);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header-title { font-size: 16px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--muted2); margin-top: 1px; }
+  .status-pill {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(0,230,118,0.12);
+    color: var(--green);
+    border: 1px solid rgba(0,230,118,0.3);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* LAYOUT */
+  .container { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 69px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  .section-label {
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px; font-weight: 600;
+  }
+
+  /* SIGNAL CARD */
+  .signal-preview {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 20px;
+    font-family: var(--mono);
+  }
+  .signal-preview .mult {
+    font-size: 40px; font-weight: 700;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .signal-preview .mult span { font-size: 22px; color: var(--gold2); }
+  .signal-meta { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .meta-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px;
+  }
+  .meta-row .label { color: var(--muted2); }
+  .meta-row .value { font-weight: 600; }
+
+  .badge {
+    padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    font-family: var(--mono);
+  }
+  .badge-green { background: rgba(0,230,118,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(245,200,66,0.15); color: var(--gold); }
+
+  /* CONTROLS */
+  .control-group { display: flex; flex-direction: column; gap: 10px; }
+  label { font-size: 12px; color: var(--muted2); margin-bottom: 4px; display: block; }
+
+  input[type="number"], select {
+    width: 100%; padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="number"]:focus, select:focus { border-color: var(--gold); }
+  select option { background: #1a1a1a; }
+
+  .toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px;
+    background: var(--bg); border: 1px solid var(--border2); border-radius: 8px;
+  }
+  .toggle-label { font-size: 13px; color: var(--text); }
+  .toggle {
+    width: 36px; height: 20px; background: var(--border2);
+    border-radius: 10px; position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle.on { background: var(--gold); }
+  .toggle::after {
+    content: ''; width: 14px; height: 14px;
+    background: white; border-radius: 50%;
+    position: absolute; top: 3px; left: 3px;
+    transition: left 0.2s;
+  }
+  .toggle.on::after { left: 19px; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 11px 20px; border-radius: 8px; cursor: pointer;
+    font-family: var(--font); font-size: 14px; font-weight: 600;
+    border: none; width: 100%; transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--gold); color: #0a0a0a;
+  }
+  .btn-primary:hover { background: var(--gold2); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost {
+    background: transparent; color: var(--muted2);
+    border: 1px solid var(--border2);
+  }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* MAIN CONTENT */
+  .main { padding: 28px 32px; display: flex; flex-direction: column; gap: 28px; }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .stat-value { font-size: 28px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+  .stat-delta { font-size: 12px; color: var(--green); margin-top: 4px; }
+
+  /* SCHEDULE */
+  .schedule-section {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px;
+  }
+  .schedule-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .schedule-title { font-size: 14px; font-weight: 600; }
+
+  .time-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .time-slot {
+    padding: 10px 0; text-align: center; border-radius: 8px;
+    font-size: 13px; font-family: var(--mono); font-weight: 600;
+    cursor: pointer; border: 1px solid transparent;
+    transition: all 0.15s; background: var(--bg); color: var(--muted2);
+    border-color: var(--border);
+  }
+  .time-slot.active {
+    background: var(--gold-dim); color: var(--gold);
+    border-color: rgba(245,200,66,0.4);
+  }
+  .time-slot:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+
+  /* LOG */
+  .log-section {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px;
+    flex: 1;
+  }
+  .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .log-title { font-size: 14px; font-weight: 600; }
+  .clear-btn { font-size: 12px; color: var(--muted); cursor: pointer; background: none; border: none; font-family: var(--font); }
+  .clear-btn:hover { color: var(--red); }
+
+  .log-list { display: flex; flex-direction: column; gap: 1px; }
+  .log-entry {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 6px;
+    font-size: 13px; font-family: var(--mono);
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  .log-entry:hover { background: var(--surface2); }
+  .log-time { color: var(--muted); min-width: 60px; font-size: 11px; }
+  .log-tag {
+    padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; min-width: 52px; text-align: center;
+  }
+  .tag-auto { background: rgba(0,230,118,0.12); color: var(--green); }
+  .tag-manual { background: var(--gold-dim); color: var(--gold); }
+  .tag-system { background: rgba(100,100,100,0.15); color: var(--muted2); }
+  .log-msg { color: var(--text); flex: 1; }
+  .log-mult { color: var(--gold); font-weight: 700; margin-left: auto; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">✈</div>
+  <div>
+    <div class="header-title">Aviator Signal Bot</div>
+    <div class="header-sub">Painel de controle — Void Partners</div>
+  </div>
+  <div class="status-pill"><div class="dot"></div> Bot Online</div>
+</div>
+
+<div class="container">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div>
+      <div class="section-label">Preview do Sinal</div>
+      <div class="signal-preview">
+        <div class="mult" id="prev-mult">2.75<span>x</span></div>
+        <div class="signal-meta">
+          <div class="meta-row">
+            <span class="label">Horário</span>
+            <span class="value" id="prev-time">--:--</span>
+          </div>
+          <div class="meta-row">
+            <span class="label">Confiança</span>
+            <span class="badge badge-green" id="prev-conf">🟢 Alto</span>
+          </div>
+          <div class="meta-row">
+            <span class="label">Entradas</span>
+            <span class="value" id="prev-ent">2x</span>
+          </div>
+          <div class="meta-row">
+            <span class="label">Canal</span>
+            <span class="value" style="color:var(--gold)" id="prev-canal">@canal</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Configurar Sinal</div>
+      <div class="control-group">
+        <div>
+          <label>Multiplicador</label>
+          <input type="number" id="mult-input" value="2.75" step="0.05" min="1.2" max="20">
+        </div>
+        <div>
+          <label>Canal Telegram</label>
+          <input type="text" id="canal-input" value="@seu_canal" style="font-family:var(--mono);width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;outline:none;">
+        </div>
+        <div>
+          <label>Confiança</label>
+          <select id="conf-select">
+            <option value="🟢 Alto">🟢 Alto</option>
+            <option value="🟡 Médio">🟡 Médio</option>
+          </select>
+        </div>
+        <div>
+          <label>Entradas</label>
+          <select id="ent-select">
+            <option value="1">1x</option>
+            <option value="2" selected>2x</option>
+            <option value="3">3x</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Automático</div>
+      <div class="control-group">
+        <div class="toggle-row">
+          <span class="toggle-label">Sinais automáticos</span>
+          <div class="toggle on" id="toggle-auto" onclick="toggleAuto(this)"></div>
+        </div>
+        <div>
+          <label>Intervalo (minutos)</label>
+          <input type="number" id="interval-input" value="15" min="5" max="120">
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:auto;">
+      <button class="btn btn-primary" onclick="dispararSinal()">
+        ✈ Disparar Sinal Agora
+      </button>
+      <button class="btn btn-ghost" onclick="gerarAleatorio()">
+        ↺ Gerar Aleatório
+      </button>
+    </div>
+
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Sinais Hoje</div>
+        <div class="stat-value" id="stat-hoje">0</div>
+        <div class="stat-delta">+0 na última hora</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Sinais Totais</div>
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-delta">desde o início</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Mult. Médio</div>
+        <div class="stat-value" id="stat-avg">—</div>
+        <div class="stat-delta">últimos 10 sinais</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Próximo Auto</div>
+        <div class="stat-value" id="stat-next" style="font-size:20px;padding-top:4px">--:--</div>
+        <div class="stat-delta" id="stat-next-sub">automático ativo</div>
+      </div>
+    </div>
+
+    <div class="schedule-section">
+      <div class="schedule-header">
+        <span class="schedule-title">Horários de Pico Ativos</span>
+        <span style="font-size:12px;color:var(--muted2)">Clique para ativar/desativar</span>
+      </div>
+      <div class="time-grid" id="time-grid"></div>
+    </div>
+
+    <div class="log-section">
+      <div class="log-header">
+        <span class="log-title">Log de Disparos</span>
+        <button class="clear-btn" onclick="clearLog()">Limpar</button>
+      </div>
+      <div class="log-list" id="log-list">
+        <div style="text-align:center;color:var(--muted);font-size:13px;padding:32px 0;">
+          Nenhum sinal disparado ainda.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let statsHoje = 0, statsTotal = 0, multList = [];
+let autoEnabled = true, autoInterval = 15;
+let autoTimer = null, nextAutoTime = null;
+let logEntries = [];
+
+const horariosPico = ["09:00","10:00","12:00","14:00","15:00","17:00","19:00","20:00","21:00","22:00","23:00","00:00"];
+let activeHorarios = new Set(["09:00","12:00","19:00","21:00","22:00","23:00"]);
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init() {
+  renderTimeGrid();
+  updatePreview();
+  addLog("system", "Bot inicializado e pronto.");
+  startAutoScheduler();
+  updateNextAuto();
+  setInterval(updateNextAuto, 1000);
+
+  document.getElementById("mult-input").addEventListener("input", updatePreview);
+  document.getElementById("canal-input").addEventListener("input", updatePreview);
+  document.getElementById("conf-select").addEventListener("change", updatePreview);
+  document.getElementById("ent-select").addEventListener("change", updatePreview);
+  document.getElementById("interval-input").addEventListener("change", () => {
+    autoInterval = parseInt(document.getElementById("interval-input").value) || 15;
+    if(autoEnabled) { clearInterval(autoTimer); startAutoScheduler(); }
+  });
+}
+
+// ─── TIME GRID ────────────────────────────────────────────────────────────────
+function renderTimeGrid() {
+  const grid = document.getElementById("time-grid");
+  grid.innerHTML = "";
+  horariosPico.forEach(h => {
+    const el = document.createElement("div");
+    el.className = "time-slot" + (activeHorarios.has(h) ? " active" : "");
+    el.textContent = h;
+    el.onclick = () => {
+      if(activeHorarios.has(h)) activeHorarios.delete(h); else activeHorarios.add(h);
+      el.classList.toggle("active");
+    };
+    grid.appendChild(el);
+  });
+}
+
+// ─── PREVIEW ─────────────────────────────────────────────────────────────────
+function updatePreview() {
+  const mult = parseFloat(document.getElementById("mult-input").value) || 2.75;
+  const canal = document.getElementById("canal-input").value || "@canal";
+  const conf = document.getElementById("conf-select").value;
+  const ent = document.getElementById("ent-select").value;
+
+  const now = new Date();
+  now.setMinutes(now.getMinutes() + Math.floor(Math.random()*3)+1);
+  const timeStr = now.toTimeString().slice(0,5);
+
+  document.getElementById("prev-mult").innerHTML = mult.toFixed(2) + "<span>x</span>";
+  document.getElementById("prev-time").textContent = timeStr;
+  document.getElementById("prev-conf").textContent = conf;
+  document.getElementById("prev-ent").textContent = ent + "x";
+  document.getElementById("prev-canal").textContent = canal;
+}
+
+// ─── DISPARAR ─────────────────────────────────────────────────────────────────
+function dispararSinal() {
+  const mult = parseFloat(document.getElementById("mult-input").value) || 2.75;
+  statsHoje++; statsTotal++;
+  multList.push(mult);
+  if(multList.length > 10) multList.shift();
+
+  addLog("manual", `Sinal disparado via painel`, mult);
+  updateStats();
+
+  // Animação do botão
+  const btn = document.querySelector(".btn-primary");
+  btn.textContent = "✅ Enviado!";
+  btn.style.background = "var(--green)";
+  setTimeout(() => {
+    btn.textContent = "✈ Disparar Sinal Agora";
+    btn.style.background = "";
+  }, 1800);
+}
+
+function gerarAleatorio() {
+  const mult = (Math.random() < 0.05)
+    ? (Math.random()*10+5).toFixed(2)
+    : (Math.random()*3+1.5).toFixed(2);
+  document.getElementById("mult-input").value = mult;
+  const confs = ["🟢 Alto","🟢 Alto","🟢 Alto","🟡 Médio"];
+  document.getElementById("conf-select").value = confs[Math.floor(Math.random()*4)];
+  document.getElementById("ent-select").value = Math.floor(Math.random()*3)+1;
+  updatePreview();
+}
+
+// ─── AUTO ─────────────────────────────────────────────────────────────────────
+function toggleAuto(el) {
+  autoEnabled = !autoEnabled;
+  el.classList.toggle("on", autoEnabled);
+  if(autoEnabled) {
+    startAutoScheduler();
+    addLog("system", "Sinais automáticos ativados.");
+  } else {
+    clearInterval(autoTimer);
+    nextAutoTime = null;
+    addLog("system", "Sinais automáticos pausados.");
+  }
+}
+
+function startAutoScheduler() {
+  clearInterval(autoTimer);
+  const ms = (autoInterval || 15) * 60 * 1000;
+  nextAutoTime = new Date(Date.now() + ms);
+  autoTimer = setInterval(() => {
+    gerarAleatorio();
+    const mult = parseFloat(document.getElementById("mult-input").value);
+    statsHoje++; statsTotal++;
+    multList.push(mult);
+    if(multList.length > 10) multList.shift();
+    addLog("auto", "Sinal automático enviado", mult);
+    updateStats();
+    const ms2 = (autoInterval || 15) * 60 * 1000;
+    nextAutoTime = new Date(Date.now() + ms2);
+  }, ms);
+}
+
+function updateNextAuto() {
+  const el = document.getElementById("stat-next");
+  const sub = document.getElementById("stat-next-sub");
+  if(!autoEnabled || !nextAutoTime) {
+    el.textContent = "—";
+    sub.textContent = "automático pausado";
+    return;
+  }
+  const diff = Math.max(0, nextAutoTime - Date.now());
+  const m = Math.floor(diff/60000);
+  const s = Math.floor((diff%60000)/1000);
+  el.textContent = `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  sub.textContent = "próximo envio";
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById("stat-hoje").textContent = statsHoje;
+  document.getElementById("stat-total").textContent = statsTotal;
+  if(multList.length) {
+    const avg = multList.reduce((a,b)=>a+b,0)/multList.length;
+    document.getElementById("stat-avg").textContent = avg.toFixed(2)+"x";
+  }
+}
+
+// ─── LOG ──────────────────────────────────────────────────────────────────────
+function addLog(type, msg, mult) {
+  const now = new Date().toTimeString().slice(0,5);
+  logEntries.unshift({ type, msg, mult, time: now });
+  if(logEntries.length > 50) logEntries.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const list = document.getElementById("log-list");
+  if(!logEntries.length) {
+    list.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:32px 0;">Nenhum sinal disparado ainda.</div>`;
+    return;
+  }
+  list.innerHTML = logEntries.map(e => `
+    <div class="log-entry">
+      <span class="log-time">${e.time}</span>
+      <span class="log-tag tag-${e.type}">${e.type}</span>
+      <span class="log-msg">${e.msg}</span>
+      ${e.mult ? `<span class="log-mult">${parseFloat(e.mult).toFixed(2)}x</span>` : ""}
+    </div>
+  `).join("");
+}
+
+function clearLog() {
+  logEntries = [];
+  renderLog();
+}
+
+init();
+</script>
+</body>
+</html>
