@@ -1,9 +1,9 @@
 """
 ===========================================
-  AVIATOR SIGNAL BOT - Telegram
+  AVIATOR SIGNAL BOT - Telegram v3
   Autor: Void Partners
 ===========================================
-Dependências: pip install python-telegram-bot schedule requests python-dotenv pytz
+pip install python-telegram-bot schedule python-dotenv
 """
 
 import os
@@ -16,12 +16,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 load_dotenv()
 
@@ -30,48 +25,70 @@ BOT_TOKEN  = os.getenv("BOT_TOKEN", "SEU_TOKEN_AQUI")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "@seu_canal")
 ADMIN_IDS  = [int(x) for x in os.getenv("ADMIN_IDS", "0").split(",")]
 LINK_CASA  = os.getenv("LINK_CASA", "https://seu-link-afiliado.com")
+TZ         = ZoneInfo("Europe/Lisbon")
 
-TZ = ZoneInfo("Europe/Lisbon")  # Horário de Portugal
+# ─── ESTADO DOS SINAIS ────────────────────────────────────────────────────────
+# sinais_pendentes[sinal_id] = { multiplicador, horario, message_id_resultado }
+sinais_pendentes = {}
+sinal_counter = 0
 
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
-def hora_portugal():
+def hora_pt():
     return datetime.now(TZ)
 
+def novo_id():
+    global sinal_counter
+    sinal_counter += 1
+    return sinal_counter
+
 def gerar_sinal():
-    multiplicador = round(random.uniform(1.5, 4.5), 2)
+    mult = round(random.uniform(1.5, 4.5), 2)
     if random.random() < 0.05:
-        multiplicador = round(random.uniform(5.0, 15.0), 2)
-
-    # Horário de entrada = agora + 1 a 2 min (em Portugal)
-    horario = hora_portugal() + timedelta(minutes=random.randint(1, 2))
-    horario_str = horario.strftime("%H:%M")
-
+        mult = round(random.uniform(5.0, 15.0), 2)
+    horario = hora_pt() + timedelta(minutes=random.randint(1, 2))
     niveis = ["🟡 Médio", "🟢 Alto", "🟢 Alto", "🟢 Alto"]
-    confianca = random.choice(niveis)
-
     return {
-        "multiplicador": multiplicador,
-        "horario": horario_str,
-        "confianca": confianca,
+        "id": novo_id(),
+        "multiplicador": mult,
+        "horario": horario.strftime("%H:%M"),
+        "confianca": random.choice(niveis),
     }
 
-def formatar_sinal(sinal: dict) -> str:
-    mult = sinal["multiplicador"]
-    emoji = "🚀" if mult >= 5 else "✈️"
-
+def msg_sinal(sinal):
+    emoji = "🚀" if sinal["multiplicador"] >= 5 else "✈️"
     return (
         f"👀 Nossa IA identificou um padrão...\n"
         f"\n"
-        f"{emoji} *Meta:* `{mult}x`\n"
+        f"{emoji} *Meta:* `{sinal['multiplicador']}x`\n"
         f"⏰ *Janela de entrada:* `{sinal['horario']}`\n"
         f"📊 *Confiança:* {sinal['confianca']}\n"
+        f"🔖 *ID:* `#{sinal['id']}`\n"
         f"\n"
         f"Essa é a sua chance. Não perca.\n"
         f"\n"
         f"🔞 _Jogue com responsabilidade._"
     )
 
-def formatar_divulgacao() -> str:
+def msg_resultado(sinal, green: bool):
+    if green:
+        return (
+            f"✅ *GREEN* `#{sinal['id']}`\n"
+            f"\n"
+            f"🎯 Meta de `{sinal['multiplicador']}x` *atingida!*\n"
+            f"⏰ Entrada: `{sinal['horario']}`\n"
+            f"\n"
+            f"💰 Quem entrou, lucrou. Próximo sinal em breve! 🔥"
+        )
+    else:
+        return (
+            f"❌ *RED* `#{sinal['id']}`\n"
+            f"\n"
+            f"Meta de `{sinal['multiplicador']}x` não atingida.\n"
+            f"\n"
+            f"😤 Faz parte. Próximo sinal vai compensar! 💪"
+        )
+
+def msg_divulgacao():
     return (
         f"🏦 *CASA RECOMENDADA*\n"
         f"\n"
@@ -82,11 +99,90 @@ def formatar_divulgacao() -> str:
         f"✅ Suporte 24h\n"
         f"✅ *Bónus de 100% no 1º depósito*\n"
         f"\n"
-        f"👇 Acesse agora e garante o seu bónus:"
+        f"👇 Acessa agora e garante o teu bónus:"
     )
 
-# ─── COMANDOS ─────────────────────────────────────────────────────────────────
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ─── ENVIO DE RESULTADO ───────────────────────────────────────────────────────
+async def enviar_resultado(sinal_id: int, green: bool):
+    """Envia ou edita a mensagem de resultado de um sinal."""
+    if sinal_id not in sinais_pendentes:
+        return
+
+    sinal = sinais_pendentes[sinal_id]
+    texto = msg_resultado(sinal, green)
+
+    try:
+        # Se já existe mensagem de resultado, edita ela
+        if sinal.get("result_msg_id"):
+            await bot_instance.edit_message_text(
+                chat_id=CHANNEL_ID,
+                message_id=sinal["result_msg_id"],
+                text=texto,
+                parse_mode="Markdown",
+            )
+        else:
+            # Envia nova mensagem de resultado
+            sent = await bot_instance.send_message(
+                chat_id=CHANNEL_ID,
+                text=texto,
+                parse_mode="Markdown",
+            )
+            sinais_pendentes[sinal_id]["result_msg_id"] = sent.message_id
+
+        status = "GREEN ✅" if green else "RED ❌"
+        print(f"[{hora_pt().strftime('%H:%M:%S')} PT] {status} — Sinal #{sinal_id} ({sinal['multiplicador']}x)")
+
+        # Remove do pendente após registrar resultado
+        if green is not None:
+            del sinais_pendentes[sinal_id]
+
+    except Exception as e:
+        print(f"[ERRO resultado] {e}")
+
+# ─── JOBS AUTOMÁTICOS ─────────────────────────────────────────────────────────
+bot_instance = None
+
+async def job_sinal():
+    sinal = gerar_sinal()
+    try:
+        await bot_instance.send_message(
+            chat_id=CHANNEL_ID,
+            text=msg_sinal(sinal),
+            parse_mode="Markdown",
+        )
+        # Salva sinal como pendente
+        sinais_pendentes[sinal["id"]] = {**sinal, "result_msg_id": None}
+        print(f"[{hora_pt().strftime('%H:%M:%S')} PT] ✈️ Sinal #{sinal['id']}: {sinal['multiplicador']}x")
+
+        # Agenda resultado automático em 3 minutos
+        sinal_id = sinal["id"]
+        async def resultado_auto():
+            await asyncio.sleep(180)  # 3 minutos
+            # Só envia se ainda não foi corrigido manualmente
+            if sinal_id in sinais_pendentes and sinais_pendentes[sinal_id].get("result_msg_id") is None:
+                green = random.random() < 0.80  # 80% green
+                await enviar_resultado(sinal_id, green)
+
+        asyncio.create_task(resultado_auto())
+
+    except Exception as e:
+        print(f"[ERRO sinal] {e}")
+
+async def job_divulgacao():
+    keyboard = [[InlineKeyboardButton("🎰 Garantir Bónus de 100%", url=LINK_CASA)]]
+    try:
+        await bot_instance.send_message(
+            chat_id=CHANNEL_ID,
+            text=msg_divulgacao(),
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        print(f"[{hora_pt().strftime('%H:%M:%S')} PT] 📢 Divulgação enviada")
+    except Exception as e:
+        print(f"[ERRO divulgação] {e}")
+
+# ─── COMANDOS ADMIN ───────────────────────────────────────────────────────────
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🎰 Acessar Plataforma", url=LINK_CASA)]]
     await update.message.reply_text(
         "✈️ *BEM-VINDO AO AVIATOR SIGNALS!*\n\n"
@@ -101,81 +197,84 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
-async def sinal_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_disparar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Sem permissão.")
         return
-    sinal = gerar_sinal()
-    await context.bot.send_message(chat_id=CHANNEL_ID, text=formatar_sinal(sinal), parse_mode="Markdown")
+    await job_sinal()
     await update.message.reply_text("✅ Sinal disparado!")
 
-async def divulgar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_green(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: /green 5 — marca sinal #5 como green"""
     if update.effective_user.id not in ADMIN_IDS:
         return
-    keyboard = [[InlineKeyboardButton("🎰 Garantir Bónus de 100%", url=LINK_CASA)]]
-    await context.bot.send_message(
-        chat_id=CHANNEL_ID,
-        text=formatar_divulgacao(),
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+    try:
+        sinal_id = int(context.args[0])
+        if sinal_id not in sinais_pendentes:
+            await update.message.reply_text(f"❌ Sinal #{sinal_id} não encontrado ou já encerrado.")
+            return
+        await enviar_resultado(sinal_id, green=True)
+        await update.message.reply_text(f"✅ GREEN aplicado no sinal #{sinal_id}!")
+    except (IndexError, ValueError):
+        await update.message.reply_text("❌ Uso: /green 5")
+
+async def cmd_red(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: /red 5 — marca sinal #5 como red"""
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    try:
+        sinal_id = int(context.args[0])
+        if sinal_id not in sinais_pendentes:
+            await update.message.reply_text(f"❌ Sinal #{sinal_id} não encontrado ou já encerrado.")
+            return
+        await enviar_resultado(sinal_id, green=False)
+        await update.message.reply_text(f"✅ RED aplicado no sinal #{sinal_id}!")
+    except (IndexError, ValueError):
+        await update.message.reply_text("❌ Uso: /red 5")
+
+async def cmd_pendentes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: lista sinais aguardando resultado"""
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    if not sinais_pendentes:
+        await update.message.reply_text("📭 Nenhum sinal pendente.")
+        return
+    linhas = [f"*Sinais pendentes:*\n"]
+    for sid, s in sinais_pendentes.items():
+        linhas.append(f"• `#{sid}` — {s['multiplicador']}x — entrada {s['horario']}")
+    await update.message.reply_text("\n".join(linhas), parse_mode="Markdown")
+
+async def cmd_divulgar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    await job_divulgacao()
     await update.message.reply_text("✅ Divulgação enviada!")
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
         return
     await update.message.reply_text(
-        f"🤖 *Status do Bot*\n\n"
+        f"🤖 *Status*\n\n"
         f"✅ Online\n"
         f"📢 Canal: `{CHANNEL_ID}`\n"
-        f"🕐 Hora PT: `{hora_portugal().strftime('%d/%m/%Y %H:%M:%S')}`",
+        f"🕐 Hora PT: `{hora_pt().strftime('%d/%m/%Y %H:%M:%S')}`\n"
+        f"⏳ Pendentes: `{len(sinais_pendentes)}`",
         parse_mode="Markdown",
     )
 
 # ─── SCHEDULER ────────────────────────────────────────────────────────────────
-bot_instance = None
-sinal_count = 0  # Contador para intercalar divulgação
-
-async def job_sinal():
-    global sinal_count
-    if not bot_instance:
-        return
-    sinal_count += 1
-    sinal = gerar_sinal()
-    try:
-        await bot_instance.send_message(
-            chat_id=CHANNEL_ID,
-            text=formatar_sinal(sinal),
-            parse_mode="Markdown",
-        )
-        print(f"[{hora_portugal().strftime('%H:%M:%S')} PT] ✅ Sinal #{sinal_count}: {sinal['multiplicador']}x")
-    except Exception as e:
-        print(f"[ERRO sinal] {e}")
-
-async def job_divulgacao():
-    if not bot_instance:
-        return
-    keyboard = [[InlineKeyboardButton("🎰 Garantir Bónus de 100%", url=LINK_CASA)]]
-    try:
-        await bot_instance.send_message(
-            chat_id=CHANNEL_ID,
-            text=formatar_divulgacao(),
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
-        print(f"[{hora_portugal().strftime('%H:%M:%S')} PT] 📢 Divulgação enviada")
-    except Exception as e:
-        print(f"[ERRO divulgação] {e}")
-
 def run_scheduler():
-    def wrap(coro):
+    loop = asyncio.new_event_loop()
+
+    def wrap(coro_fn):
         def fn():
-            asyncio.run(coro())
+            loop.run_until_complete(coro_fn())
         return fn
 
-    schedule.every(3).minutes.do(wrap(job_sinal))        # Sinal a cada 3 min
-    schedule.every(20).minutes.do(wrap(job_divulgacao))  # Divulgação a cada 20 min
+    schedule.every(3).minutes.do(wrap(job_sinal))
+    schedule.every(20).minutes.do(wrap(job_divulgacao))
 
+    loop.run_forever() if False else None
     while True:
         schedule.run_pending()
         time.sleep(1)
@@ -184,22 +283,31 @@ def run_scheduler():
 def main():
     global bot_instance
 
-    print("🚀 Iniciando Aviator Signal Bot...")
-    print(f"📢 Canal: {CHANNEL_ID}")
-    print(f"🕐 Timezone: Portugal (Europe/Lisbon)")
+    print("🚀 Aviator Signal Bot v3 iniciando...")
+    print(f"📢 Canal: {CHANNEL_ID} | 🕐 Timezone: Portugal")
 
     app = Application.builder().token(BOT_TOKEN).build()
     bot_instance = app.bot
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("disparar", sinal_manual))
-    app.add_handler(CommandHandler("divulgar", divulgar_manual))
-    app.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("start",     cmd_start))
+    app.add_handler(CommandHandler("disparar",  cmd_disparar))
+    app.add_handler(CommandHandler("green",     cmd_green))
+    app.add_handler(CommandHandler("red",       cmd_red))
+    app.add_handler(CommandHandler("pendentes", cmd_pendentes))
+    app.add_handler(CommandHandler("divulgar",  cmd_divulgar))
+    app.add_handler(CommandHandler("status",    cmd_status))
 
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-    scheduler_thread.start()
-    print("⏰ Scheduler iniciado — sinais a cada 3min, divulgação a cada 20min")
-    print("✅ Bot online!")
+    t = threading.Thread(target=run_scheduler, daemon=True)
+    t.start()
+    print("⏰ Scheduler: sinal a cada 3min | divulgação a cada 20min")
+    print("✅ Bot online!\n")
+    print("Comandos admin:")
+    print("  /disparar        → dispara sinal manual")
+    print("  /green <id>      → marca sinal como GREEN")
+    print("  /red <id>        → marca sinal como RED")
+    print("  /pendentes       → lista sinais sem resultado")
+    print("  /divulgar        → envia divulgação manual")
+    print("  /status          → status do bot")
 
     app.run_polling(drop_pending_updates=True)
 
