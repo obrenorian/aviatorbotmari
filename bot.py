@@ -3,7 +3,7 @@
   AVIATOR SIGNAL BOT - Telegram
   Autor: Void Partners
 ===========================================
-Dependências: pip install python-telegram-bot schedule requests python-dotenv
+Dependências: pip install python-telegram-bot schedule requests python-dotenv pytz
 """
 
 import os
@@ -13,6 +13,7 @@ import time
 import random
 import threading
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -20,174 +21,160 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
     ContextTypes,
-    MessageHandler,
-    filters,
 )
 
 load_dotenv()
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-BOT_TOKEN   = os.getenv("BOT_TOKEN", "SEU_TOKEN_AQUI")
-CHANNEL_ID  = os.getenv("CHANNEL_ID", "@seu_canal")   # Ex: @meucanal ou -100123456789
-ADMIN_IDS   = [int(x) for x in os.getenv("ADMIN_IDS", "0").split(",")]  # IDs separados por vírgula
+BOT_TOKEN  = os.getenv("BOT_TOKEN", "SEU_TOKEN_AQUI")
+CHANNEL_ID = os.getenv("CHANNEL_ID", "@seu_canal")
+ADMIN_IDS  = [int(x) for x in os.getenv("ADMIN_IDS", "0").split(",")]
+LINK_CASA  = os.getenv("LINK_CASA", "https://seu-link-afiliado.com")
 
-# ─── GERADOR DE SINAIS ────────────────────────────────────────────────────────
+TZ = ZoneInfo("Europe/Lisbon")  # Horário de Portugal
+
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
+def hora_portugal():
+    return datetime.now(TZ)
+
 def gerar_sinal():
-    """Gera um sinal realista para o Aviator."""
     multiplicador = round(random.uniform(1.5, 4.5), 2)
-    # Chance de sinal alto (5%) para variedade
     if random.random() < 0.05:
         multiplicador = round(random.uniform(5.0, 15.0), 2)
 
-    horario = datetime.now() + timedelta(minutes=random.randint(1, 3))
+    # Horário de entrada = agora + 1 a 2 min (em Portugal)
+    horario = hora_portugal() + timedelta(minutes=random.randint(1, 2))
     horario_str = horario.strftime("%H:%M")
 
-    niveis_confianca = ["🟡 Médio", "🟢 Alto", "🟢 Alto", "🟢 Alto"]  # 75% alto
-    confianca = random.choice(niveis_confianca)
-
-    entradas = random.randint(1, 3)
+    niveis = ["🟡 Médio", "🟢 Alto", "🟢 Alto", "🟢 Alto"]
+    confianca = random.choice(niveis)
 
     return {
         "multiplicador": multiplicador,
         "horario": horario_str,
         "confianca": confianca,
-        "entradas": entradas,
     }
 
-def formatar_mensagem_sinal(sinal: dict, numero: int = None) -> str:
-    """Formata a mensagem do sinal para envio."""
-    emoji_mult = "🚀" if sinal["multiplicador"] >= 5 else "✈️"
-    header = f"#{numero} " if numero else ""
+def formatar_sinal(sinal: dict) -> str:
+    mult = sinal["multiplicador"]
+    emoji = "🚀" if mult >= 5 else "✈️"
 
     return (
-        f"╔══════════════════════╗\n"
-        f"║  {emoji_mult}  SINAL AVIATOR  {emoji_mult}  ║\n"
-        f"╚══════════════════════╝\n"
+        f"👀 Nossa IA identificou um padrão...\n"
         f"\n"
-        f"🎯 *Multiplicador:* `{sinal['multiplicador']}x`\n"
-        f"⏰ *Horário de Entrada:* `{sinal['horario']}`\n"
+        f"{emoji} *Meta:* `{mult}x`\n"
+        f"⏰ *Janela de entrada:* `{sinal['horario']}`\n"
         f"📊 *Confiança:* {sinal['confianca']}\n"
-        f"🔁 *Entradas:* `{sinal['entradas']}x`\n"
         f"\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚠️ _Gerencie sua banca com responsabilidade._\n"
-        f"🔞 _Maior de 18 anos._"
+        f"Essa é a sua chance. Não perca.\n"
+        f"\n"
+        f"🔞 _Jogue com responsabilidade._"
     )
 
-# ─── COMANDOS DO BOT ──────────────────────────────────────────────────────────
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("📡 Receber Sinais", callback_data="info_sinais")],
-        [InlineKeyboardButton("🔗 Acessar Plataforma", url="https://seu-link-afiliado.com")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+def formatar_divulgacao() -> str:
+    return (
+        f"🏦 *CASA RECOMENDADA*\n"
+        f"\n"
+        f"Jogamos e confiamos nessa plataforma há meses.\n"
+        f"\n"
+        f"✅ Licenciada e regulamentada\n"
+        f"✅ Saque rápido via PIX\n"
+        f"✅ Suporte 24h\n"
+        f"✅ *Bónus de 100% no 1º depósito*\n"
+        f"\n"
+        f"👇 Acesse agora e garante o seu bónus:"
+    )
 
+# ─── COMANDOS ─────────────────────────────────────────────────────────────────
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton("🎰 Acessar Plataforma", url=LINK_CASA)]]
     await update.message.reply_text(
         "✈️ *BEM-VINDO AO AVIATOR SIGNALS!*\n\n"
-        "Aqui você recebe os melhores sinais do Aviator em tempo real.\n\n"
+        "Recebe os melhores sinais do Aviator em tempo real.\n\n"
         "📌 *Como usar:*\n"
-        "1️⃣ Acesse a plataforma pelo botão abaixo\n"
-        "2️⃣ Aguarde o sinal aparecer aqui\n"
-        "3️⃣ Entre na rodada no horário indicado\n"
-        "4️⃣ Retire antes do multiplicador indicado ✅\n\n"
-        "🟢 *Sinais chegando em breve...*",
+        "1️⃣ Acede à plataforma pelo botão abaixo\n"
+        "2️⃣ Aguarda o sinal aparecer aqui\n"
+        "3️⃣ Entra na ronda no horário indicado\n"
+        "4️⃣ Retira antes do multiplicador ✅\n\n"
+        "🟢 *Sinais a cada 3 minutos...*",
         parse_mode="Markdown",
-        reply_markup=reply_markup,
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 async def sinal_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin: dispara um sinal manualmente."""
     if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Você não tem permissão.")
+        await update.message.reply_text("❌ Sem permissão.")
         return
-
     sinal = gerar_sinal()
-    msg = formatar_mensagem_sinal(sinal)
+    await context.bot.send_message(chat_id=CHANNEL_ID, text=formatar_sinal(sinal), parse_mode="Markdown")
+    await update.message.reply_text("✅ Sinal disparado!")
 
+async def divulgar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    keyboard = [[InlineKeyboardButton("🎰 Garantir Bónus de 100%", url=LINK_CASA)]]
     await context.bot.send_message(
         chat_id=CHANNEL_ID,
-        text=msg,
+        text=formatar_divulgacao(),
         parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
-    await update.message.reply_text("✅ Sinal disparado no canal!")
-
-async def sinal_customizado(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin: /sinal 2.50 - dispara sinal com multiplicador específico."""
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Você não tem permissão.")
-        return
-
-    try:
-        mult = float(context.args[0])
-        sinal = gerar_sinal()
-        sinal["multiplicador"] = mult
-        msg = formatar_mensagem_sinal(sinal)
-
-        await context.bot.send_message(
-            chat_id=CHANNEL_ID,
-            text=msg,
-            parse_mode="Markdown",
-        )
-        await update.message.reply_text(f"✅ Sinal `{mult}x` disparado!", parse_mode="Markdown")
-    except (IndexError, ValueError):
-        await update.message.reply_text("❌ Uso correto: /sinal 2.50")
+    await update.message.reply_text("✅ Divulgação enviada!")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin: mostra o status do bot."""
     if update.effective_user.id not in ADMIN_IDS:
         return
-
     await update.message.reply_text(
         f"🤖 *Status do Bot*\n\n"
         f"✅ Online\n"
         f"📢 Canal: `{CHANNEL_ID}`\n"
-        f"🕐 Hora atual: `{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}`\n"
-        f"👤 Admins: `{len(ADMIN_IDS)}`",
+        f"🕐 Hora PT: `{hora_portugal().strftime('%d/%m/%Y %H:%M:%S')}`",
         parse_mode="Markdown",
     )
 
-async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "info_sinais":
-        await query.message.reply_text(
-            "📡 *Como receber os sinais:*\n\n"
-            "Os sinais são enviados automaticamente no canal.\n"
-            "Fique de olho nas notificações! 🔔",
-            parse_mode="Markdown",
-        )
-
-# ─── SCHEDULER DE SINAIS AUTOMÁTICOS ─────────────────────────────────────────
+# ─── SCHEDULER ────────────────────────────────────────────────────────────────
 bot_instance = None
+sinal_count = 0  # Contador para intercalar divulgação
 
-async def enviar_sinal_automatico():
-    """Envia um sinal automático para o canal."""
+async def job_sinal():
+    global sinal_count
     if not bot_instance:
         return
+    sinal_count += 1
     sinal = gerar_sinal()
-    msg = formatar_mensagem_sinal(sinal)
     try:
         await bot_instance.send_message(
             chat_id=CHANNEL_ID,
-            text=msg,
+            text=formatar_sinal(sinal),
             parse_mode="Markdown",
         )
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Sinal automático enviado: {sinal['multiplicador']}x")
+        print(f"[{hora_portugal().strftime('%H:%M:%S')} PT] ✅ Sinal #{sinal_count}: {sinal['multiplicador']}x")
     except Exception as e:
-        print(f"[ERRO] Falha ao enviar sinal: {e}")
+        print(f"[ERRO sinal] {e}")
+
+async def job_divulgacao():
+    if not bot_instance:
+        return
+    keyboard = [[InlineKeyboardButton("🎰 Garantir Bónus de 100%", url=LINK_CASA)]]
+    try:
+        await bot_instance.send_message(
+            chat_id=CHANNEL_ID,
+            text=formatar_divulgacao(),
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        print(f"[{hora_portugal().strftime('%H:%M:%S')} PT] 📢 Divulgação enviada")
+    except Exception as e:
+        print(f"[ERRO divulgação] {e}")
 
 def run_scheduler():
-    """Roda o scheduler em thread separada."""
-    async def job():
-        await enviar_sinal_automatico()
+    def wrap(coro):
+        def fn():
+            asyncio.run(coro())
+        return fn
 
-    def scheduled_job():
-        asyncio.run(job())
-
-    # Configura os horários de envio automático (ajuste conforme necessário)
-    schedule.every(15).minutes.do(scheduled_job)   # A cada 15 minutos
-    # schedule.every().hour.at(":00").do(scheduled_job)  # Alternativa: de hora em hora
+    schedule.every(3).minutes.do(wrap(job_sinal))        # Sinal a cada 3 min
+    schedule.every(20).minutes.do(wrap(job_divulgacao))  # Divulgação a cada 20 min
 
     while True:
         schedule.run_pending()
@@ -199,24 +186,21 @@ def main():
 
     print("🚀 Iniciando Aviator Signal Bot...")
     print(f"📢 Canal: {CHANNEL_ID}")
-    print(f"👤 Admins: {ADMIN_IDS}")
+    print(f"🕐 Timezone: Portugal (Europe/Lisbon)")
 
     app = Application.builder().token(BOT_TOKEN).build()
     bot_instance = app.bot
 
-    # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("disparar", sinal_manual))
-    app.add_handler(CommandHandler("sinal", sinal_customizado))
+    app.add_handler(CommandHandler("divulgar", divulgar_manual))
     app.add_handler(CommandHandler("status", status))
-    app.add_handler(CallbackQueryHandler(callback_handler))
 
-    # Inicia scheduler em background
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
-    print("⏰ Scheduler de sinais automáticos iniciado.")
+    print("⏰ Scheduler iniciado — sinais a cada 3min, divulgação a cada 20min")
+    print("✅ Bot online!")
 
-    print("✅ Bot online! Aguardando comandos...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
