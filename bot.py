@@ -88,6 +88,15 @@ def msg_resultado(sinal, green: bool):
             f"😤 Faz parte. Próximo sinal vai compensar! 💪"
         )
 
+def botoes_sinal():
+    """Botões que aparecem em todos os sinais e resultados."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🆘 Quero ajuda pra jogar", url=f"https://t.me/{os.getenv('SUPORTE_USER', 'seu_suporte')}"),
+            InlineKeyboardButton("🎰 Jogar agora", url=LINK_CASA),
+        ]
+    ])
+
 def msg_divulgacao():
     return (
         f"🏦 *CASA RECOMENDADA*\n"
@@ -119,6 +128,7 @@ async def enviar_resultado(sinal_id: int, green: bool):
                 message_id=sinal["result_msg_id"],
                 text=texto,
                 parse_mode="Markdown",
+                reply_markup=botoes_sinal(),
             )
         else:
             # Envia nova mensagem de resultado
@@ -126,6 +136,7 @@ async def enviar_resultado(sinal_id: int, green: bool):
                 chat_id=CHANNEL_ID,
                 text=texto,
                 parse_mode="Markdown",
+                reply_markup=botoes_sinal(),
             )
             sinais_pendentes[sinal_id]["result_msg_id"] = sent.message_id
 
@@ -149,6 +160,7 @@ async def job_sinal():
             chat_id=CHANNEL_ID,
             text=msg_sinal(sinal),
             parse_mode="Markdown",
+            reply_markup=botoes_sinal(),
         )
         # Salva sinal como pendente
         sinais_pendentes[sinal["id"]] = {**sinal, "result_msg_id": None}
